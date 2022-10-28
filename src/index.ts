@@ -34,8 +34,9 @@ const ParseJson = (path) => {
     let forChildren = new Set();
     let forMen = new Set();
     let forWomen = new Set();
+    let proba = new Set();
 
-    information.push(style, coreStoneInsert, additionInfoInsert, insertDescription, inserts, forChildren, forMen, forWomen);
+    information.push(style, coreStoneInsert, additionInfoInsert, insertDescription, inserts, forChildren, forMen, forWomen, proba);
 
     productsInfo.forEach((productInfo) => {
         style.add(productInfo["Стиль"]);
@@ -46,6 +47,7 @@ const ParseJson = (path) => {
         forChildren.add(productInfo["ДляДетей"]);
         forMen.add(productInfo["ДляМужчин"]);
         forWomen.add(productInfo["ДляЖенщин"]);
+        proba.add(productInfo["Проба"]);
     });
 
     fs.writeFileSync("./json/information.json", JSON.stringify({
@@ -57,6 +59,7 @@ const ParseJson = (path) => {
         ["ДляДетей"]: Array.from(information[5]),
         ["ДляМужчин"]: Array.from(information[6]),
         ["ДляЖенщин"]: Array.from(information[7]),
+        ["Пробы"]: Array.from(information[8]),
     }, null, "\t"));
 }
 
