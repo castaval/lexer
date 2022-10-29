@@ -10,10 +10,11 @@ async function generateSentence(weight: number, material: string, category: stri
     let auditoryForm = getAuditoryForm(auditory);
     let probaForm = getProbaForm(proba);
     let insertForm: string = await getInsertForm(insert, category);
+    let endSentense = await getEndOfSentense();
 
     let firstPart = `${category} из ${materialForm}`;
     let secondPart = '';
-    let thirdPart = `, весом ${weight} ${gramForm}.`;
+    let thirdPart = `, весом ${weight} ${gramForm}, `;
 
     if (auditoryForm) {
         firstPart = `${category} ${auditoryForm} из ${materialForm}`;
@@ -24,10 +25,10 @@ async function generateSentence(weight: number, material: string, category: stri
     }
 
     if (probaForm) {
-        thirdPart = `, ${probaForm} и весом ${weight} ${gramForm}.`; 
+        thirdPart = `, ${probaForm} и весом ${weight} ${gramForm}, `; 
     }
     
-    return firstPart + secondPart + thirdPart;
+    return firstPart + secondPart + thirdPart + endSentense;
 }
 
 function getGramForm(weight: number): string {
@@ -80,7 +81,7 @@ function getAuditoryForm(auditories: {
         case 1:
             return stringOfAuditory[0];
         case 2:
-            return `${stringOfAuditory[0]}, ${stringOfAuditory[1].split(" ")[1]}`
+            return `${stringOfAuditory[0]} и ${stringOfAuditory[1].split(" ")[1]}`
         case 3:
             return `${stringOfAuditory[0]}, ${stringOfAuditory[1].split(" ")[1]} и ${stringOfAuditory[2].split(" ")[1]}`
     }
@@ -104,6 +105,100 @@ function getInsertForm(insertString, category) : Promise<string> {
 
     let inserts = insertString.split(",");
 
+    let promise = new Promise<string>((resolve, reject) => {
+        Az.Morph.init('./dicts', () => {
+            let wordsToString = [];
+    
+            inserts.forEach((insert) => {
+                let words = insert.split(' ');
+                let nouns = [];
+                let adjectives = [];
+                let number;
+    
+                const regexLatin = new RegExp(/([a-zA-Z])\w+/g);
+    
+                for (let word of words) {
+                    if (Number(word)) {
+                        number = Number(word);
+                        continue;
+                    } 
+
+                    word = word.toLowerCase();
+    
+                    let wordMorph = Az.Morph(word);
+
+                    wordMorph = wordMorph[0];
+
+                    console.log(wordMorph);
+    
+                    if (word.includes('.')) {
+                        continue;
+                    }
+    
+                    if (regexLatin.test(word)) {
+                        nouns.push(word);
+                        continue;
+                    }
+
+                    if (word == "бесцветный") {
+                        continue;
+                    }
+
+                    if (number > 1) {
+                        wordMorph = wordMorph.inflect(['plur', 'ablt']);
+                    } else {
+                        wordMorph = wordMorph.inflect(['sing', 'ablt']);
+                    }
+
+                    if (nouns.length >= 1 && wordMorph.matches(['NOUN'])) {
+                        wordMorph = wordMorph.inflect(['sing', 'nomn']);
+                    } 
+
+                    if (wordMorph.matches(['NOUN'])) {
+                        nouns.push(wordMorph.toString())
+                    }
+    
+                    if (wordMorph.matches(['ADJF'])) {
+                        adjectives.push(wordMorph.toString());
+                    }
+                }
+
+                if (nouns.length > 1) {
+                    if (nouns[0].includes(nouns[1])) {
+                        nouns.pop();
+                    } else if (nouns[1].includes(nouns[0]))  {
+                        nouns.shift();
+                    }
+                }
+                
+                wordsToString.push(`${adjectives.join(" ")} ${nouns.join(" ")}`)
+            });
+
+            let c;
+    
+            if (wordsToString[0].startsWith('c')) {
+                c = ' co ';
+            } else {
+                c = ' c ';
+            }
+
+            if (wordsToString.length > 1) {
+                let stringInsert = wordsToString.join(', ').replace(/\,(?=[^,]*$)/gm, ' и');
+                stringInsert = stringInsert.replace(/^\s+|\s+$|\s+(?=\s)/g, "");
+                
+                resolve(c + stringInsert);
+            }
+            
+            wordsToString[0] = wordsToString[0].replace(/^\s+|\s+$|\s+(?=\s)/g, "");
+
+            resolve(c + wordsToString[0]);
+        });
+    });
+
+    return promise;
+}
+
+function getEndOfSentense() {
     let adjectAdd = ['идеально ',
     'хорошо ',
     'великолепно ', 
@@ -120,104 +215,22 @@ function getInsertForm(insertString, category) : Promise<string> {
     'смотрится с ',
     'сочетается с '];
 
-    
-
     let promise = new Promise<string>((resolve, reject) => {
         Az.Morph.init('./dicts', () => {
-            let wordsToString = [];
-    
-            inserts.forEach((insert) => {
-                let words = insert.split(' ');
-                let nouns = [];
-                let adjectives = [];
-                let number;
-    
-                const regexLatin = new RegExp(/([a-zA-Z])\w+/g);
-    
-                for (let word of words) {
-                    if (+word) {
-                        number = +word;
-                        continue;
-                    }
-    
-                    word = word.toLowerCase();
-    
-                    let wordMorph = Az.Morph(word);
-    
-                    wordMorph = wordMorph[0];
-    
-                    if (word.includes('.')) {
-                        continue;
-                    }
-    
-                    if (regexLatin.test(word)) {
-                        nouns.push(word);
-                        continue;
-                    }
-
-                    if (word == "бесцветный") {
-                        continue;
-                    }
-                    
-                    if (nouns.length < 1 && wordMorph.matches(['NOUN'])) {
-                        wordMorph = wordMorph.inflect(['sing', 'ablt']);
-                    } 
-                    
-    
-                    if (number > 1 && !wordMorph.matches(['nomn'])) {
-                        wordMorph = wordMorph.inflect(['plur','ablt']);
-                    }
-    
-    
-                    if (wordMorph.matches(['NOUN'])) {
-                        nouns.push(wordMorph.toString())
-                    }
-    
-                    if (wordMorph.matches(['ADJF'])) {
-                        adjectives.push(wordMorph.toString());
-                    }
-                }
-                
-                let setWord = new Set<string>(nouns);
-
-                nouns = Array.from(setWord);
-
-                wordsToString.push(`${adjectives.join(" ")} ${nouns.join(" ")}`)
-            });
-
-            let c;
-    
-            if (wordsToString[0].startsWith('c')) {
-                c = ' co ';
-            } else {
-                c = ' c ';
-            }
-
-
             let randomAdd = Math.floor(Math.random() * (adjectAdd.length - 1));
             let randomEnd = Math.floor(Math.random() * (endAdd.length - 1));
 
             let needWord = endAdd[randomEnd].split(' ')[0];
-            let end2;
+            let end2 = needWord;
 
-            let categoryParse = Az.Morph(category)[0].matches(['plur']);
+            let categoryParse = Az.Morph(category)[0].matches(['plur']) || Az.Morph(category)[1].matches(['plur']);
 
             if (categoryParse) {
-                end2 = Az.Morph(needWord)[0].inflect(['plur'].toString())
+                end2 = Az.Morph(needWord)[0].inflect(['plur', 'indc', '3per']).toString();
             }
 
-            let endPart = `${adjectAdd[randomAdd]}${end2}`;
-
-            if (wordsToString.length > 1) {
-                let stringInsert = wordsToString.join(', ').replace(/\,(?=[^,]*$)/gm, ' и');
-                stringInsert = stringInsert.replace(/^\s+|\s+$|\s+(?=\s)/g, "");
-                
-                resolve(c + stringInsert + endPart);
-            }
-            
-            wordsToString[0] = wordsToString[0].replace(/^\s+|\s+$|\s+(?=\s)/g, "");
-
-            resolve(c + wordsToString[0] + endPart);
+            let endPart = `${adjectAdd[randomAdd]}${end2} ${endAdd[randomEnd].split(' ')[1]}`;
+            resolve(endPart);
         });
     });
 
@@ -226,17 +239,17 @@ function getInsertForm(insertString, category) : Promise<string> {
 
 let weight = 85;
 let material = "Белое золото";
-let category = "Часы";
+let category = "Серьги";
 
 let proba = 43;
 
 let auditory = {
     ["ДляДетей"]: true,
-    ["ДляМужчин"]: false,
+    ["ДляМужчин"]: true,
     ["ДляЖенщин"]: true,
 };
 
-let insert = "5 Топаз лондон,5 Ситалл турмалин зеленый,8 Фианит бесцветный";
+let insert = "Бриллиант бесцветный,Керамика черный матовый";
 
 let sentence = generateSentence(weight, material, category, insert, proba, auditory).then((data) => console.log(data));
 
